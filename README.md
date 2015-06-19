@@ -29,17 +29,19 @@ A file named openrc in the current user's home directory with Openstack creds.
 
 # Instructions/Demo:
 
-Initially, we have added a CLI component so that VIFs can be created and deleted by hand. This will be automated in the future and tied into the swarm agent directly or hooked into a registry such as etcd.
+There are two ways to use Clampify. First, you can use it as a CLI tool to create/delete VIFs and attach them to a Docker container. Second, you can run Clampify as an agent. In this mode, it will watch the stream of events being published by the Docker Daemon and add an interface to the container hooked into an exisiting Neutron network.
 
-##### To create a VIF, provide the name of a neutron network and an arbitrary name to use for the network namespace:
+### Clampify as a CLI tool:
+
+#### To create a VIF, provide the name of a neutron network and an arbitrary name to use for the network namespace:
 
 root@vizio-devswarm-host1:~/gocode/src/github.rtp.raleigh.ibm.com/clampify# go run clampify.go create demo-net blue
 
-##### To delete a previously created VIF, provide the port ID of the corresponding Neutron port and the name of the network namespace:
+#### To delete a previously created VIF, provide the port ID of the corresponding Neutron port and the name of the network namespace:
 
 go run clampify.go delete 64f4d2de-fa88-4238-8c51-045cea76aed4 blue
 
-# To check if things are working:
+#### To check if things are working:
 (on the compute node, run:)
 (this will run a python webserver on port 8000 inside the network namespace)
 ip netns exec blue python -m SimpleHTTPServer
@@ -56,7 +58,7 @@ qrouter-28d266f5-c9f9-40f3-8a07-c11dcae13d53
 
 ip netns exec qrouter-28d266f5-c9f9-40f3-8a07-c11dcae13d53 telnet 192.168.1.15 8000
 
-# Create a neutron port and attach it to a docker container
+#### Create a neutron port and attach it to a docker container
 
 go run clampify.go insert demo-net 7bfbd1af154d246fd3e5405eb7893e3a06682944148b15af4d11192b97d2d393
 
@@ -67,3 +69,7 @@ First argument to cli is the command (insert), followed by the neutron network n
 go run clampify.go reinsert 7bfbd1af154d246fd3e5405eb7893e3a06682944148b15af4d11192b97d2d393 8ebbcf7f-1995-494f-89b7-0714fdacb9a2 192.168.1.22
 
 First argument to cli is the command (reinsert), followed by the container id, the neutron port id and the IP address
+
+### Clampify as an agent:
+
+go run clampify.go watch demo-net
