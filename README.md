@@ -64,7 +64,7 @@ go run clampify.go insert demo-net 7bfbd1af154d246fd3e5405eb7893e3a06682944148b1
 
 First argument to cli is the command (insert), followed by the neutron network name (demo-net in this case) and then the container id
 
-# If you stopped a docker container, and start it again, it seems to lose connectivity. This is how to restore it on the same neutron port:
+#### If you stopped a docker container, and start it again, it seems to lose connectivity. This is how to restore it on the same neutron port:
 
 go run clampify.go reinsert 7bfbd1af154d246fd3e5405eb7893e3a06682944148b15af4d11192b97d2d393 8ebbcf7f-1995-494f-89b7-0714fdacb9a2 192.168.1.22
 
@@ -73,3 +73,5 @@ First argument to cli is the command (reinsert), followed by the container id, t
 ### Clampify as an agent:
 
 go run clampify.go watch demo-net
+
+The above command must be 
