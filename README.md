@@ -74,4 +74,4 @@ First argument to cli is the command (reinsert), followed by the container id, t
 
 go run clampify.go watch demo-net
 
-The above command must be 
+The above command must be run on every compute node/minion. The final argument is the name of the Neutron network to which all containers created on this host will be attached to. In the future, we expect to change this so that more fine grain control can be provided.
