@@ -129,7 +129,7 @@ func main() {
 				fmt.Printf("%s: %s\n", m.Status, m.Id)
 				container_id := m.Id
 				if m.Status == "create" {
-					init_nw(netname, container_id)
+					init_nw(netname, container_id, config.HostName, config.HostIPAddress, config.BroadcastIPAddress, config.NetSize)
 				}
 			}
 		} else if os.Args[1] == "insert" {
@@ -141,7 +141,7 @@ func main() {
 			netns := container_id
 			createNSForDockerContainer(container_id)
 			addTapDeviceToNetNS(portName, netns)
-			applyIPAddressToTapDeviceInNetNS(ip_address+config.NetSize, config.BroadcastIPaddress, portName, netns)
+			applyIPAddressToTapDeviceInNetNS(ip_address+config.NetSize, config.BroadcastIPAddress, portName, netns)
 			associate_port_with_host(port_id, config.HostName, config.HostIPAddress)
 
 		} else if os.Args[1] == "reinsert" {
@@ -201,15 +201,15 @@ func associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddre
 	runCmd(cmdToRun, false, true, false)
 }
 
-func init_nw(netname string, container_id string) {
+func init_nw(netname string, container_id string, compute_node_name string, neutron_server_ipaddress string, broadcastAddress string, net_size string) {
 	port_id, mac_address, ip_address := make_neutron_port(netname)
 	createVIFOnHost(port_id, mac_address)
 	portName := port_id[:11]
 	netns := container_id
 	createNSForDockerContainer(container_id)
 	addTapDeviceToNetNS(portName, netns)
-	applyIPAddressToTapDeviceInNetNS(ip_address+"/24", "192.168.1.255", portName, netns)
-	associate_port_with_host(port_id, "vizio-devswarm-host1", "10.120.39.40")
+	applyIPAddressToTapDeviceInNetNS(ip_address+net_size, broadcastAddress, portName, netns)
+	associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddress)
 }
 
 func delete_neutron_port(port_id string) {
