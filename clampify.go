@@ -29,6 +29,7 @@ func print_help() {
 	fmt.Println("insert net-name container-id")
 	fmt.Println("reinsert container-id port-id ip-address")
 	fmt.Println("watch net-name")
+	fmt.Println("clear-neutron-ports")
 }
 
 type DockerDaemonMessage struct {
@@ -69,7 +70,7 @@ func listenToDockerDaemonMessages(ch chan<- DockerDaemonMessage) {
 }
 
 type Config struct {
-	HostName, HostIPAddress, NetSize, BroadcastIPAddress, NeutronServerIPAddress string
+	HostName, HostIPAddress, NetSize, BroadcastIPAddress, NeutronServerIPAddress, InspectAtStartup string
 }
 
 type ContainerNetworkInfo struct {
@@ -104,6 +105,7 @@ func processConfigFile() *Config {
 	config.NetSize = m["net-size"]
 	config.BroadcastIPAddress = m["broadcast-ipaddress"]
 	config.NeutronServerIPAddress = m["neutronserver-ipaddress"]
+	config.InspectAtStartup = m["inspect-at-startup"]
 	return config
 }
 
@@ -111,6 +113,11 @@ func processConfigFile() *Config {
 func main() {
 	config := processConfigFile()
 	fmt.Println("Network Attach Utility Started on " + config.HostName)
+	if config.InspectAtStartup == "yes" {
+		fmt.Println("Inspecting state of Neutron at startup")
+		mapped_ports := inspect_existing_neutron_ports(config.HostName)
+		fmt.Println("Found ", len(mapped_ports), " ports on this host")
+	}
 	//runSudo("ovs-vsctl show", true, true, true)
 	//createVIF("192.168.1.5/24","192.168.1.255","a54be265-98f8-4275-bdeb-3d3d73221d10","fa:16:3e:b4:8a:d5","purple")
 	//txt := runCmdWithOutput("source ~/openrc;keystone token-get",true,true,false,true)
@@ -130,6 +137,8 @@ func main() {
 			netns := os.Args[3]
 			delete_neutron_port(port_id)
 			deleteVIF(port_id, netns)
+		} else if os.Args[1] == "clear-neutron-ports" {
+			delete_all_neutron_ports_on_host(config.HostName)
 		} else if os.Args[1] == "watch" {
 			containerInfo := make(map[string]*ContainerNetworkInfo)
 			netname := os.Args[2]
@@ -243,11 +252,23 @@ func init_nw(netname string, container_id string, compute_node_name string, neut
 	return res
 }
 
+func delete_all_neutron_ports_on_host(hostname string) {
+	fmt.Println("Inspecting state of Neutron")
+	mapped_ports_on_host := inspect_existing_neutron_ports(hostname)
+	fmt.Println("Found", len(mapped_ports_on_host), "ports on this host")
+	for _, map_val := range mapped_ports_on_host {
+		fmt.Println("Deleting port", map_val["id"])
+		delete_neutron_port(map_val["id"])
+	}
+}
+
+// Given a Neutron port-id, delete the port
 func delete_neutron_port(port_id string) {
 	cmdToRun := fmt.Sprintf("source ~/openrc;neutron port-delete %s", port_id)
 	runCmdWithOutput(cmdToRun, false, false, false, false)
 }
 
+// Given an existing Neutron network name, create a port and return the port id, mac address and ip address
 // Returns port_id, mac address and ip address
 func make_neutron_port(networkName string) (string, string, string) {
 	cmdToRun := fmt.Sprintf("source ~/openrc;neutron port-create %s", networkName)
@@ -270,6 +291,68 @@ func make_neutron_port(networkName string) (string, string, string) {
 		fmt.Println("Error", err)
 	}
 	return a_map["id"], a_map["mac_address"], ip_address
+}
+
+// Inspect all existing Neutron ports
+func inspect_existing_neutron_ports(hostname string) []map[string]string {
+	cmdToRun := fmt.Sprintf("source ~/openrc;neutron port-list -c id -c mac_address -c binding:host_id -c fixed_ips")
+	txt := runCmdWithOutput(cmdToRun, false, true, false, true)
+	cmdResults := make_maps_from_lines(txt, false)
+	result := []map[string]string{}
+	for _, map_val := range cmdResults {
+		if map_val["binding:host_id"] == hostname {
+			result = append(result, map_val)
+		}
+	}
+	return result
+}
+
+// This function helps to deal with the output of the Openstack CLIs. Particularly, for functions that return a header row followed by content, this function will be useful.
+// Expected input format:
+// -----------------------------
+// | TOK_HEADER1 | TOK_HEADER2 |
+// -----------------------------
+// | LINE1_V1    | LINE1_V2    |
+// | LINE2_V1    | LINE2_V2    |
+// -----------------------------
+// Output: Slice of maps, where each map corresponds to a line of values. The above sample input would result in a slice of two maps. The first map would be
+// {TOK_HEADER1: LINE1_V1 , TOK_HEADER2: LINE1_V2}
+// Each of the values are trimmed and assumed to be string values
+func make_maps_from_lines(txt []byte, verbose bool) []map[string]string {
+	lines := strings.Split(string(txt), "\n")
+	result := []map[string]string{}
+	if len(lines) > 4 {
+		keys := []string{}
+		toks := strings.Split(lines[1], "|")
+		for _, tok := range toks {
+			trimmed_tok := strings.TrimSpace(tok)
+			if trimmed_tok != "" {
+				if verbose {
+					fmt.Println("Token", tok)
+				}
+			}
+			// Add blank tokens to the token slice. We will filter them out of the map later
+			keys = append(keys, strings.TrimSpace(tok))
+		}
+		// Process rows with values
+		content_lines := lines[3 : len(lines)-2]
+		for _, line := range content_lines {
+			//fmt.Println(idx, line)
+			map_for_line := map[string]string{}
+			line_toks := strings.Split(line, "|")
+			for line_item_idx, line_item := range line_toks {
+				trimmed_tok := strings.TrimSpace(line_item)
+				if keys[line_item_idx] != "" {
+					map_for_line[keys[line_item_idx]] = trimmed_tok
+				}
+			}
+			result = append(result, map_for_line)
+			if verbose {
+				fmt.Printf("%+v\n", map_for_line)
+			}
+		}
+	}
+	return result
 }
 
 func get_auth_token_id() string {
