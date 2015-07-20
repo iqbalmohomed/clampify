@@ -141,7 +141,9 @@ func main() {
 				container_id := m.Id
 				if m.Status == "create" {
 					containerInfo[container_id] = init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
-					fmt.Print(containerInfo)
+					for c := range containerInfo {
+						fmt.Printf("%+v\n", *containerInfo[c])
+					}
 				}
 			}
 		} else if os.Args[1] == "insert" {
