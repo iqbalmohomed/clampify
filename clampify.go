@@ -68,7 +68,16 @@ func listenToDockerDaemonMessages(ch chan<- DockerDaemonMessage) {
 }
 
 type Config struct {
-	HostName, HostIPAddress, NetSize, BroadcastIPAddress string
+	HostName, HostIPAddress, NetSize, BroadcastIPAddress, NeutronServerIPAddress string
+}
+
+type ContainerNetworkInfo struct {
+	ContainerID        string
+	NetworkNamespace   string
+	NeutronPortID      string
+	MacAddress         string
+	IPAddress          string
+	NeutronNetworkName string
 }
 
 func processConfigFile() *Config {
@@ -93,6 +102,7 @@ func processConfigFile() *Config {
 	config.HostIPAddress = m["host-ipaddress"]
 	config.NetSize = m["net-size"]
 	config.BroadcastIPAddress = m["broadcast-ipaddress"]
+	config.NeutronServerIPAddress = m["neutronserver-ipaddress"]
 	return config
 }
 
@@ -112,7 +122,7 @@ func main() {
 			netns := os.Args[3]
 			port_id, mac_address, ip_address := make_neutron_port(netname)
 			createVIF(ip_address+config.NetSize, config.BroadcastIPAddress, port_id, mac_address, netns)
-			associate_port_with_host(port_id, config.HostName, config.HostIPAddress)
+			associate_port_with_host(port_id, config.HostName, config.NeutronServerIPAddress)
 			fmt.Printf("IP_ADDRESS: %s, PORT_ID: %s\n", ip_address, port_id)
 		} else if os.Args[1] == "delete" {
 			port_id := os.Args[2]
@@ -120,6 +130,7 @@ func main() {
 			delete_neutron_port(port_id)
 			deleteVIF(port_id, netns)
 		} else if os.Args[1] == "watch" {
+			containerInfo := make(map[string]*ContainerNetworkInfo)
 			netname := os.Args[2]
 			messages := make(chan DockerDaemonMessage)
 			go listenToDockerDaemonMessages(messages)
@@ -129,7 +140,8 @@ func main() {
 				fmt.Printf("%s: %s\n", m.Status, m.Id)
 				container_id := m.Id
 				if m.Status == "create" {
-					init_nw(netname, container_id, config.HostName, config.HostIPAddress, config.BroadcastIPAddress, config.NetSize)
+					containerInfo[container_id] = init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
+					fmt.Print(containerInfo)
 				}
 			}
 		} else if os.Args[1] == "insert" {
@@ -142,7 +154,7 @@ func main() {
 			createNSForDockerContainer(container_id)
 			addTapDeviceToNetNS(portName, netns)
 			applyIPAddressToTapDeviceInNetNS(ip_address+config.NetSize, config.BroadcastIPAddress, portName, netns)
-			associate_port_with_host(port_id, config.HostName, config.HostIPAddress)
+			associate_port_with_host(port_id, config.HostName, config.NeutronServerIPAddress)
 
 		} else if os.Args[1] == "reinsert" {
 			container_id := os.Args[2]
@@ -153,7 +165,7 @@ func main() {
 			createNSForDockerContainer(container_id)
 			addTapDeviceToNetNS(portName, netns)
 			applyIPAddressToTapDeviceInNetNS(ip_address+config.NetSize, config.BroadcastIPAddress, portName, netns)
-			associate_port_with_host(port_id, config.HostName, config.HostIPAddress)
+			associate_port_with_host(port_id, config.HostName, config.NeutronServerIPAddress)
 
 		} else {
 			print_help()
@@ -201,7 +213,7 @@ func associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddre
 	runCmd(cmdToRun, false, true, false)
 }
 
-func init_nw(netname string, container_id string, compute_node_name string, neutron_server_ipaddress string, broadcastAddress string, net_size string) {
+func init_nw(netname string, container_id string, compute_node_name string, neutron_server_ipaddress string, broadcastAddress string, net_size string) *ContainerNetworkInfo {
 	port_id, mac_address, ip_address := make_neutron_port(netname)
 	createVIFOnHost(port_id, mac_address)
 	portName := port_id[:11]
@@ -210,6 +222,8 @@ func init_nw(netname string, container_id string, compute_node_name string, neut
 	addTapDeviceToNetNS(portName, netns)
 	applyIPAddressToTapDeviceInNetNS(ip_address+net_size, broadcastAddress, portName, netns)
 	associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddress)
+	res := &ContainerNetworkInfo{container_id, netns, port_id, mac_address, ip_address, netname}
+	return res
 }
 
 func delete_neutron_port(port_id string) {
