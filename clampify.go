@@ -18,6 +18,7 @@ const (
 	Rehersal    = true
 	ShowCommand = true
 	ShowOutput  = true
+	Debug       = true
 )
 
 func print_help() {
@@ -141,9 +142,18 @@ func main() {
 				container_id := m.Id
 				if m.Status == "create" {
 					containerInfo[container_id] = init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
-					for c := range containerInfo {
-						fmt.Printf("%+v\n", *containerInfo[c])
+					if Debug {
+						for c := range containerInfo {
+							fmt.Printf("%+v\n", *containerInfo[c])
+						}
 					}
+				} else if m.Status == "destroy" {
+					if containerRef, ok := containerInfo[container_id]; ok {
+						delete_nw(containerRef)
+					} else if Debug {
+						fmt.Println("Container with no metadata was destroyed. Manual cleanup may be needed")
+					}
+
 				}
 			}
 		} else if os.Args[1] == "insert" {
@@ -200,6 +210,11 @@ func main() {
 
 	// Uncomment to delete the VIF
 	//deleteVIF("b58f6d35-89b8-467b-abc7-3faea4e4df24","yellow")
+}
+
+func delete_nw(c_info *ContainerNetworkInfo) {
+	delete_neutron_port(c_info.NeutronPortID)
+	deleteVIF(c_info.NeutronPortID, c_info.NetworkNamespace)
 }
 
 func associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddress string) {
