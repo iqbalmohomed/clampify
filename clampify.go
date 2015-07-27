@@ -504,7 +504,7 @@ func createVIFOnHost(portid string, macaddress string) {
 }
 
 /* This will create a net namespace with the same name as that of the docker container */
-func createNSForDockerContainer(container_id string) {
+func createNSForDockerContainer(container_id string) error {
 	var cmdToRun string
 	// Ensure that netns folder exists
 	cmdToRun = "mkdir -p /var/run/netns"
@@ -515,6 +515,10 @@ func createNSForDockerContainer(container_id string) {
 	n := len(txt)
 	container_pid := strings.TrimSpace(string(txt[:n]))
 	fmt.Println("PID for container is: " + container_pid)
+	if container_pid == "0" {
+		// TODO cleanup
+		return errors.New("PID for container was 0. Is it running?")
+	}
 
 	cmdToRun = fmt.Sprintf("ln -sf /proc/%s/ns/net /var/run/netns/%s", container_pid, container_id)
 	runSudo(cmdToRun, true, true, false)
