@@ -150,10 +150,13 @@ func main() {
 				fmt.Printf("%s: %s\n", m.Status, m.Id)
 				container_id := m.Id
 				if m.Status == "start" {
-					containerInfo[container_id] = init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
-					if Debug {
-						for c := range containerInfo {
-							fmt.Printf("%+v\n", *containerInfo[c])
+					conIn, er := init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
+					if er == nil {
+						containerInfo[container_id] = conIn
+						if Debug {
+							for c := range containerInfo {
+								fmt.Printf("%+v\n", *containerInfo[c])
+							}
 						}
 					}
 				} else if m.Status == "destroy" {
@@ -239,20 +242,20 @@ func associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddre
 	runCmd(cmdToRun, false, true, false)
 }
 
-func init_nw(netname string, container_id string, compute_node_name string, neutron_server_ipaddress string, broadcastAddress string, net_size string) *ContainerNetworkInfo, error {
+func init_nw(netname string, container_id string, compute_node_name string, neutron_server_ipaddress string, broadcastAddress string, net_size string) (*ContainerNetworkInfo, error) {
 	port_id, mac_address, ip_address := make_neutron_port(netname)
 	createVIFOnHost(port_id, mac_address)
 	portName := port_id[:11]
 	netns := container_id
 	err := createNSForDockerContainer(container_id)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	addTapDeviceToNetNS(portName, netns)
 	applyIPAddressToTapDeviceInNetNS(ip_address+net_size, broadcastAddress, portName, netns)
 	associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddress)
 	res := &ContainerNetworkInfo{container_id, netns, port_id, mac_address, ip_address, netname}
-	return res,nil
+	return res, nil
 }
 
 func delete_all_neutron_ports_on_host(hostname string) {
