@@ -149,7 +149,7 @@ func main() {
 				m = <-messages
 				fmt.Printf("%s: %s\n", m.Status, m.Id)
 				container_id := m.Id
-				if m.Status == "create" {
+				if m.Status == "start" {
 					containerInfo[container_id] = init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
 					if Debug {
 						for c := range containerInfo {
