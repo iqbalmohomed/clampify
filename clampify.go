@@ -239,17 +239,20 @@ func associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddre
 	runCmd(cmdToRun, false, true, false)
 }
 
-func init_nw(netname string, container_id string, compute_node_name string, neutron_server_ipaddress string, broadcastAddress string, net_size string) *ContainerNetworkInfo {
+func init_nw(netname string, container_id string, compute_node_name string, neutron_server_ipaddress string, broadcastAddress string, net_size string) *ContainerNetworkInfo, error {
 	port_id, mac_address, ip_address := make_neutron_port(netname)
 	createVIFOnHost(port_id, mac_address)
 	portName := port_id[:11]
 	netns := container_id
-	createNSForDockerContainer(container_id)
+	err := createNSForDockerContainer(container_id)
+	if err != nil {
+		return nil,err
+	}
 	addTapDeviceToNetNS(portName, netns)
 	applyIPAddressToTapDeviceInNetNS(ip_address+net_size, broadcastAddress, portName, netns)
 	associate_port_with_host(port_id, compute_node_name, neutron_server_ipaddress)
 	res := &ContainerNetworkInfo{container_id, netns, port_id, mac_address, ip_address, netname}
-	return res
+	return res,nil
 }
 
 func delete_all_neutron_ports_on_host(hostname string) {
@@ -522,4 +525,5 @@ func createNSForDockerContainer(container_id string) error {
 
 	cmdToRun = fmt.Sprintf("ln -sf /proc/%s/ns/net /var/run/netns/%s", container_pid, container_id)
 	runSudo(cmdToRun, true, true, false)
+	return nil
 }
