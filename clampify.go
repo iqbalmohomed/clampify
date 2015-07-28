@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 const (
@@ -151,7 +152,10 @@ func main() {
 				fmt.Printf("%s: %s\n", m.Status, m.Id)
 				container_id := m.Id
 				if m.Status == "start" {
+					ts_startevent := time.Now()
 					conIn, er := init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
+					startevent_elapsed := time.Since(ts_startevent)
+					fmt.Printf("Network setup for Start took %s", startevent_elapsed)
 					if er == nil {
 						containerInfo[container_id] = conIn
 						if Debug {
@@ -162,7 +166,10 @@ func main() {
 					}
 				} else if m.Status == "destroy" {
 					if containerRef, ok := containerInfo[container_id]; ok {
+						ts_destroyevent := time.Now()
 						delete_nw(containerRef)
+						destroyevent_elapsed := time.Since(ts_destroyevent)
+						fmt.Printf("Network teardown for Destroy took %s", destroyevent_elapsed)
 					} else if Debug {
 						fmt.Println("Container with no metadata was destroyed. Manual cleanup may be needed")
 					}
