@@ -111,6 +111,11 @@ func processConfigFile() *Config {
 	return config
 }
 
+func calc_dur(end time.Time, start time.Time) int64 {
+	diff_in_nano := end.UnixNano() - start.UnixNano()
+	return diff_in_nano / 1000000
+}
+
 // Main entry point. Clampify agent can be run as a CLI tool or as a Daemon with the watch option
 func main() {
 	config := processConfigFile()
@@ -151,11 +156,14 @@ func main() {
 				m = <-messages
 				fmt.Printf("%s: %s\n", m.Status, m.Id)
 				container_id := m.Id
+				event_generatedtime := time.Unix(m.Time, 0)
 				if m.Status == "start" {
 					ts_startevent := time.Now()
 					conIn, er := init_nw(netname, container_id, config.HostName, config.NeutronServerIPAddress, config.BroadcastIPAddress, config.NetSize)
+					start_donetime := time.Now()
 					startevent_elapsed := time.Since(ts_startevent)
-					fmt.Printf("\n\nNetwork setup for Start took %s\n", startevent_elapsed)
+					start_dur := calc_dur(start_donetime, event_generatedtime)
+					fmt.Printf("\n\nNetwork setup for %s Start took %s %d\n", container_id, startevent_elapsed, start_dur)
 					if er == nil {
 						containerInfo[container_id] = conIn
 						if Debug {
@@ -168,8 +176,10 @@ func main() {
 					if containerRef, ok := containerInfo[container_id]; ok {
 						ts_destroyevent := time.Now()
 						delete_nw(containerRef)
+						destroy_donetime := time.Now()
 						destroyevent_elapsed := time.Since(ts_destroyevent)
-						fmt.Printf("Network teardown for Destroy took %s\n", destroyevent_elapsed)
+						destroy_dur := calc_dur(destroy_donetime, event_generatedtime)
+						fmt.Printf("Network teardown for %s Destroy took %s %d\n", container_id, destroyevent_elapsed, destroy_dur)
 					} else if Debug {
 						fmt.Println("Container with no metadata was destroyed. Manual cleanup may be needed")
 					}
