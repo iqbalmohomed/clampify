@@ -13,10 +13,6 @@ To get things going, you need some machines. They can be baremetal machines (e.g
 We assume we have a controller/network node that has some Openstack components setup on it. Specifically, the initial prototype uses Openstack Juno, and uses MariaDB as the Openstack DB and Rabbit MQ as the messaging platform. For networking, we utilize OVS and GRE. We followed the Basic Environment, Identity Service and Networking Component instructions for Openstack installation:
 http://docs.openstack.org/juno/install-guide/install/apt/content/
 
-Our prototype cluster is setup in Softlayer. By default, each host (we use CCIs to reduce cost) has two user visible interfaces. Eth0 is connected to the backend vlan (and gets a 10.X IP address, while eth1 is connected to the frontside vlan and gets a public IP address (e.g. 169.X). For most vlans in the Alchemy account, traffic is routed via a Vyatta box, which serves as both a router and a firewall. We explicitly requested that egress connectivity be enabled for the hosts in our cluster. However, there is no ingress connectivity allowed by the Vyatta on eth1. Rather than let eth1 go to waste, we use it for the gre tunnel setup. While someone from the Internet connect reach the external IPs of our hosts, other hosts in the same vlan/subnet can.  
-
-Important note: do not add eth1 to br-ex as part of the network node setup. If you do this, the other hosts (i.e. compute nodes) will not be able to connect to the controller/network node via is external IP address.
-
 # Dependencies:
 
 You will need:
